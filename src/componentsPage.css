@@ -1,0 +1,372 @@
+/* componentsPage.css */
+
+.components-layout {
+  min-height: 100vh;
+  background-color: #F4F4F5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #111827;
+  display: flex;
+  flex-direction: column;
+}
+
+.components-header {
+  background-color: #F4F4F5;
+  padding: 16px;
+  text-align: center;
+  border-bottom: 1px solid #E5E7EB;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.components-header h1 {
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+  color: #000;
+}
+
+.components-main {
+  flex: 1;
+  padding: 0;
+  max-width: 100%;
+}
+
+.components-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background-color: #E5E7EB;
+  gap: 1px;
+}
+
+.grid-cell {
+  background-color: #F9FAFB;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 380px;
+}
+
+.component-card {
+  background: #FFFFFF;
+  border-radius: 12px;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.component-card.card-dark {
+  background: #0A0A0A;
+  color: #FFFFFF;
+}
+
+/* Card 1 */
+.centered-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.small-caps {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #9CA3AF;
+  font-weight: 500;
+}
+
+.vertical-line {
+  width: 1px;
+  height: 24px;
+  background-color: #E5E7EB;
+}
+
+.fw-500 {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+/* Card 2 */
+.demo-box {
+  border: 1px solid #F3F4F6;
+  border-radius: 8px;
+  padding: 32px 24px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+}
+
+.demo-box h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #111;
+}
+
+.demo-icon-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #4B5563;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* Card 3 */
+.demo-box-left {
+  border: 1px solid #F3F4F6;
+  border-radius: 8px;
+  padding: 24px;
+  width: 100%;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+}
+
+.mode-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.fw-600 {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.badge-dark {
+  background: #111;
+  color: #FFF;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 16px;
+}
+
+.resize-msg {
+  border: 1px solid #F3F4F6;
+  background: #F9FAFB;
+  border-radius: 8px;
+  padding: 16px;
+  font-size: 13px;
+  color: #6B7280;
+  text-align: center;
+  font-weight: 500;
+}
+
+/* Card 4 - Dotted Dark */
+.dotted-bg {
+  position: relative;
+  overflow: hidden;
+  background-image: radial-gradient(#222 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.chat-info-box {
+  position: relative;
+  z-index: 1;
+  border: 1px solid #222;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 250px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #9CA3AF;
+  background: #000;
+}
+
+.resize-icon-wrapper {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  opacity: 0.5;
+}
+
+/* Card 5 - Buttons and Tags */
+.list-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.action-row {
+  display: flex;
+  gap: 8px;
+}
+
+.dark-btn {
+  background: transparent;
+  color: #E5E7EB;
+  border: 1px solid #333;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.dark-btn:hover {
+  background: #222;
+}
+
+.items-row {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #222;
+  border-radius: 8px;
+  background: #050505;
+}
+
+.dark-tag {
+  background: #1A1A1A;
+  color: #D1D5DB;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+/* Card 6 - Image Upload */
+.upload-wrapper {
+  width: 100%;
+  max-width: 280px;
+}
+
+.upload-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.upload-subtitle {
+  font-size: 11px;
+  color: #9CA3AF;
+  margin-bottom: 16px;
+}
+
+.upload-dropzone {
+  border: 1px dashed #D1D5DB;
+  border-radius: 8px;
+  background: #F9FAFB;
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.upload-dropzone-text {
+  font-size: 12px;
+  color: #9CA3AF;
+  line-height: 1.5;
+}
+
+/* Card 7 - Input char limit */
+.input-wrapper {
+  width: 100%;
+  max-width: 320px;
+}
+
+.input-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.char-input {
+  width: 100%;
+  padding: 12px 16px;
+  padding-right: 50px;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  background: #FFFFFF;
+}
+
+.char-input:focus {
+  border-color: #D1D5DB;
+}
+
+.char-count {
+  position: absolute;
+  right: 16px;
+  font-size: 12px;
+  color: #9CA3AF;
+  pointer-events: none;
+}
+
+/* Card 8 - Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.page-btn {
+  background: transparent;
+  border: 1px solid #E5E7EB;
+  height: 32px;
+  min-width: 32px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  border-radius: 4px;
+  margin: 0 2px;
+}
+
+.page-btn.active {
+  border-color: #E5E7EB;
+  font-weight: 500;
+  color: #111;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.page-btn.text {
+  border: none;
+  font-weight: 500;
+  color: #4B5563;
+}
+
+.page-dots {
+  color: #9CA3AF;
+  padding: 0 4px;
+  font-size: 14px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .components-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .components-grid {
+    grid-template-columns: 1fr;
+  }
+  .grid-cell {
+    min-height: 300px;
+  }
+}

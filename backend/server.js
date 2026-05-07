@@ -18,6 +18,14 @@ import { refinePrompt } from './services/promptRefinementService.js';
 import { transformToDeveloperSpec } from './services/transformerService.js';
 import { extractTextFromBuffer } from './services/textExtractionService.js';
 import { generateFigmaSpec } from './services/figmaDesignService.js';
+import {
+  generateHash,
+  getPromptFromCache,
+  setPromptToCache,
+  getAnalysisFromCache,
+  setAnalysisToCache
+} from './services/cacheService.js';
+import { summarizeContent, optimizePayload } from './services/optimizationService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -127,10 +135,10 @@ app.put('/api/components/:id', (req, res) => {
   const oldName = data.components[index].name;
   const newName = name || oldName;
 
-  data.components[index] = { 
-    ...data.components[index], 
-    name: newName, 
-    count: count !== undefined ? count : data.components[index].count 
+  data.components[index] = {
+    ...data.components[index],
+    name: newName,
+    count: count !== undefined ? count : data.components[index].count
   };
 
   // Propagate name change to subsections
@@ -202,8 +210,8 @@ app.put('/api/subsections/:id', (req, res) => {
   for (let comp of data.components) {
     const sIndex = comp.subsections.findIndex(s => s.id === id);
     if (sIndex !== -1) {
-      comp.subsections[sIndex] = { 
-        ...comp.subsections[sIndex], 
+      comp.subsections[sIndex] = {
+        ...comp.subsections[sIndex],
         title: title !== undefined ? title : comp.subsections[sIndex].title,
         prompt: prompt !== undefined ? prompt : comp.subsections[sIndex].prompt,
         code: code !== undefined ? code : comp.subsections[sIndex].code,
@@ -450,17 +458,17 @@ app.post('/api/analyze', (req, res, next) => {
 
 app.post('/api/generate-manifest', async (req, res) => {
   try {
-    const { 
-      businessName, primaryColor, secondaryColor, headingFont, bodyFont, 
+    const {
+      businessName, primaryColor, secondaryColor, headingFont, bodyFont,
       websiteLayout, sectionType, referenceUrls, contentSource, sectionOrder,
-      themeMode, platformKey 
+      themeMode, platformKey
     } = req.body;
-    
+
     const { client, type: platformType } = getAIClient(platformKey);
 
     console.log(`[Manifest] Generating architecture for ${businessName || 'A Modern Business'} in ${themeMode} mode using ${platformType}...`);
 
-    const referencesText = referenceUrls && referenceUrls.length > 0 
+    const referencesText = referenceUrls && referenceUrls.length > 0
       ? `\nReference Websites for Design Inspiration: ${referenceUrls.join(', ')}`
       : '';
 
@@ -516,7 +524,7 @@ app.post('/api/generate-manifest', async (req, res) => {
       promptResult = completion.content[0].text;
     }
 
-    res.json({ 
+    res.json({
       prompt: promptResult.trim(),
       sourceMaterial: contentSource || ''
     });
@@ -528,13 +536,13 @@ app.post('/api/generate-manifest', async (req, res) => {
 
 app.post('/api/design-manifest/reference-to-prompt', async (req, res) => {
   try {
-    const { 
-      referenceUrl, sections, businessName, primaryColor, secondaryColor, 
-      headingFont, bodyFont, websiteLayout, themeMode, sectionOrder, platformKey 
+    const {
+      referenceUrl, sections, businessName, primaryColor, secondaryColor,
+      headingFont, bodyFont, websiteLayout, themeMode, sectionOrder, platformKey
     } = req.body;
 
     const { client, type: platformType } = getAIClient(platformKey);
-    
+
     if (!referenceUrl) {
       return res.status(400).json({ success: false, error: 'referenceUrl is required' });
     }
@@ -559,10 +567,10 @@ Theme Mode: ${themeMode || 'Dark'}
     } catch (err) {
       return res.status(502).json({ success: false, error: 'Screenshot failed: Site blocked, invalid URL, or timeout.' });
     }
-    
+
     // 2. Optimize Screenshot
     const optimizedBase64 = await optimizeScreenshot(screenshotBase64);
-    
+
     // 3. Analyze with Anthropic
     let aiAnalysis;
     try {
@@ -570,10 +578,10 @@ Theme Mode: ${themeMode || 'Dark'}
     } catch (err) {
       return res.status(502).json({ success: false, error: 'AI Analysis failed: Malformed JSON or processing error.' });
     }
-    
+
     // 4. Determine Sections
     const finalSections = determineSections(sections, aiAnalysis.sections_detected);
-    
+
     // 5. Package output
     const structuredPrompt = {
       style: aiAnalysis.style,
@@ -630,23 +638,33 @@ app.post('/api/design-manifest/generate-from-reference', (req, res, next) => {
   });
 }, async (req, res) => {
   try {
-    const { 
-      referenceUrl, activeTab, manifestId, businessName, websiteLayout, 
+    const {
+      referenceUrl, activeTab, manifestId, businessName, websiteLayout,
       themeMode, primaryColor, secondaryColor,
       headingFont, bodyFont, platformKey
     } = req.body;
 
     const { client, type: platformType } = getAIClient(platformKey);
 
+    // Generate a unique hash for the entire request to check for cached results
+    const requestHash = generateHash({ ...req.body, activeTab });
+    const cachedPrompt = getPromptFromCache(requestHash);
+    if (cachedPrompt) {
+      console.log('[Optimization] Returning cached prompt for identical request.');
+      // We need to return the full response object, so we still need some metadata
+      // but the core prompt is cached.
+      return res.json(cachedPrompt);
+    }
+
     // Fix: Robust JSON parsing for references and sections
     const referenceWebsites = req.body.referenceWebsites ? (typeof req.body.referenceWebsites === 'string' ? JSON.parse(req.body.referenceWebsites) : req.body.referenceWebsites) : [];
     const clientResourcesSections = req.body.clientResourcesSections ? (typeof req.body.clientResourcesSections === 'string' ? JSON.parse(req.body.clientResourcesSections) : req.body.clientResourcesSections) : [];
     const sectionsInput = req.body.sections ? (typeof req.body.sections === 'string' ? JSON.parse(req.body.sections) : req.body.sections) : [];
     const sectionOrderInput = req.body.sectionOrder ? (typeof req.body.sectionOrder === 'string' ? JSON.parse(req.body.sectionOrder) : req.body.sectionOrder) : [];
-    
+
     // Fix: Correctly extract contentSource from either body text OR an uploaded file
     let contentSource = req.body.contentSource || '';
-    
+
     // Check for uploaded content files
     if (req.files && req.files.length > 0) {
       const contentFile = req.files.find(f => f.fieldname === 'contentFile' || f.fieldname === 'file');
@@ -660,13 +678,15 @@ app.post('/api/design-manifest/generate-from-reference', (req, res, next) => {
           }
         } catch (err) {
           console.error(`[Extraction ✗] Failed to extract from ${contentFile.originalname}:`, err.message);
-          // Fallback to body contentSource if extraction fails
         }
       }
     }
-    
+
+    // Optimization: Summarize content once if it's large
+    const contentSummary = await summarizeContent(client, contentSource, platformType);
+
     console.log(`[Refinement] Final Content Source Length: ${contentSource.length} characters`);
-    
+
     console.log(`[Unified Flow] Starting full generation for ${referenceUrl || (referenceWebsites && referenceWebsites.length ? referenceWebsites.length + ' websites' : 'Manual Manifest')}`);
 
     let screenshotBase64 = null;
@@ -684,13 +704,25 @@ app.post('/api/design-manifest/generate-from-reference', (req, res, next) => {
     if (activeTab === 'Clients Resources') {
       if (referenceWebsites && referenceWebsites.length > 0) {
         console.log(`[Unified Flow] Processing ${referenceWebsites.length} multiple reference websites for Clients Resources`);
-        
+
         for (const ref of referenceWebsites) {
           console.log(`[Unified Flow] Analyzing URL: ${ref.url}`);
+
+          // Optimization: Check analysis cache
+          const analysisHash = generateHash({ url: ref.url, businessName, themeMode });
+          const cachedAnalysis = getAnalysisFromCache(analysisHash);
+
+          if (cachedAnalysis) {
+            console.log(`[Optimization] Using cached analysis for ${ref.url}`);
+            allAnalyses.push({ ...cachedAnalysis, ...ref });
+            if (!optimizedBase64) optimizedBase64 = cachedAnalysis.screenshotBase64;
+            continue;
+          }
+
           try {
             const sBase64 = await captureScreenshot(ref.url);
             const oBase64 = await optimizeScreenshot(sBase64);
-            
+
             const userContext = `
 Business Name: ${businessName || 'A Modern Business'}
 Primary Color: ${primaryColor || 'N/A'}
@@ -704,11 +736,13 @@ Description provided by user: "${ref.description}"
 Please extract design intelligence ONLY relevant to this description.`.trim();
 
             const analysis = await analyzeUI_Image(client, oBase64, userContext, platformType);
+
+            // Cache the result
+            setAnalysisToCache(analysisHash, { ...analysis, screenshotBase64: oBase64 });
+
             allAnalyses.push({ ...analysis, ...ref });
-            
-            // Use the first screenshot as the visual representative in the UI
             if (!optimizedBase64) optimizedBase64 = oBase64;
-            
+
           } catch (err) {
             console.error(`[Unified Flow ✗] Failed processing ${ref.url}:`, err);
           }
@@ -745,27 +779,27 @@ Please extract design intelligence ONLY relevant to this section and description
           }
         }
       }
-      
-      // Combine analyses
+
       if (allAnalyses.length > 0) {
-        aiAnalysis = { ...aiAnalysis, ...allAnalyses[0] }; // Base layout etc on the first one
-        aiAnalysis.multipleAnalyses = allAnalyses; // Pass this to refinePrompt
+        aiAnalysis = { ...aiAnalysis, ...allAnalyses[0] };
+        aiAnalysis.multipleAnalyses = allAnalyses;
       }
-      
+
     } else if (referenceUrl) {
-      // Step 1: Capture Screenshot
-      try {
-        screenshotBase64 = await captureScreenshot(referenceUrl);
-      } catch (err) {
-        return res.status(502).json({ success: false, error: 'Screenshot failed: Site blocked, invalid URL, or timeout.' });
-      }
-      
-      // Step 2: Optimize Screenshot
-      optimizedBase64 = await optimizeScreenshot(screenshotBase64);
-      
-      // Step 3: Analyze with Anthropic
-      // Construct User Context for AI Blending
-      const userContext = `
+      // Optimization: Check analysis cache for single reference
+      const analysisHash = generateHash({ url: referenceUrl, businessName, themeMode });
+      const cachedAnalysis = getAnalysisFromCache(analysisHash);
+
+      if (cachedAnalysis) {
+        console.log(`[Optimization] Using cached analysis for ${referenceUrl}`);
+        aiAnalysis = cachedAnalysis;
+        optimizedBase64 = cachedAnalysis.screenshotBase64;
+      } else {
+        try {
+          screenshotBase64 = await captureScreenshot(referenceUrl);
+          optimizedBase64 = await optimizeScreenshot(screenshotBase64);
+
+          const userContext = `
 Business Name: ${businessName || 'A Modern Business'}
 Primary Color: ${primaryColor || 'N/A'}
 Secondary Color: ${secondaryColor || 'N/A'}
@@ -775,36 +809,29 @@ Website Layout/Category: ${websiteLayout || 'N/A'}
 Theme Mode: ${themeMode || 'Dark'}
 `.trim();
 
-      try {
-        aiAnalysis = await analyzeUI_Image(client, optimizedBase64, userContext, platformType);
-      } catch (err) {
-        return res.status(502).json({ success: false, error: 'AI Analysis failed: Malformed JSON or processing error.' });
+          aiAnalysis = await analyzeUI_Image(client, optimizedBase64, userContext, platformType);
+          setAnalysisToCache(analysisHash, { ...aiAnalysis, screenshotBase64: optimizedBase64 });
+        } catch (err) {
+          return res.status(502).json({ success: false, error: 'Reference analysis failed: ' + err.message });
+        }
       }
     }
-    
-    // Step 4: Determine Sections
+
     const finalSections = determineSections(sectionsInput, aiAnalysis.sections_detected);
-    
-    const context = {
-      businessName,
-      primaryColor,
-      secondaryColor,
-      headingFont,
-      bodyFont,
-      websiteLayout,
+
+    // Optimization: Clean and optimize the context payload
+    const context = optimizePayload({
+      ...req.body,
       sections: finalSections,
       sectionOrder: sectionOrderInput && sectionOrderInput.length > 0 ? sectionOrderInput : finalSections,
-      themeMode,
       structuredPrompt: aiAnalysis,
-      referenceUrl: activeTab === 'Clients Resources' && referenceWebsites && referenceWebsites.length > 0 ? referenceWebsites.map(w => w.url).join(', ') : referenceUrl,
-      multipleReferences: activeTab === 'Clients Resources' ? aiAnalysis.multipleAnalyses : null,
-      clientResourcesSections: activeTab === 'Clients Resources' ? clientResourcesSections : null,
-      contentSource
-    };
+      multipleAnalyses: aiAnalysis.multipleAnalyses,
+      contentSource,
+      contentSummary
+    });
 
-    const refinedPrompt = await refinePrompt(client, context, platformType);
+    const refinedPrompt = await refinePrompt(client, { ...context, contentSource, contentSummary }, platformType);
 
-    // Step 6: Package output
     const structuredPrompt = {
       style: aiAnalysis.style,
       layout: aiAnalysis.layout,
@@ -821,7 +848,6 @@ Theme Mode: ${themeMode || 'Dark'}
 
     const finalScreenshotUrl = optimizedBase64 ? `data:image/jpeg;base64,${optimizedBase64}` : null;
 
-    // Step 7: Persist result
     const saved = saveManifest({
       id: manifestId,
       referenceUrl,
@@ -835,24 +861,30 @@ Theme Mode: ${themeMode || 'Dark'}
       themeMode,
       analysisMetadata: {
         timestamp: new Date().toISOString(),
-        engine: platformType === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-latest'
+        engine: platformType === 'openai' ? 'gpt-4o' : 'claude-6-4-sonnet-latest'
       }
     });
 
-    res.json({
+    const responseData = {
       success: true,
       manifestId: saved.id,
       referenceUrl,
       screenshotUrl: finalScreenshotUrl,
       prompt: refinedPrompt,
       structuredPrompt
-    });
+    };
+
+    // Store in prompt cache
+    setPromptToCache(requestHash, responseData);
+
+    res.json(responseData);
 
   } catch (error) {
     console.error('[Unified Flow ✗] Error:', error?.message || error);
     res.status(500).json({ success: false, error: error?.message || 'Failed to generate from reference' });
   }
 });
+
 
 app.post('/api/design-manifest/transform', (req, res) => {
   try {
@@ -869,13 +901,13 @@ app.post('/api/design-manifest/transform', (req, res) => {
 });
 
 // ── Figma Integration ───────────────────────────────────────────────────────
-app.post('/api/figma-export', (req, res) => {
+app.post('/api/figma-export', async (req, res) => {
   try {
     const { manifest, structuredPrompt, generatedPrompt, activeTab } = req.body;
     if (!manifest) {
       return res.status(400).json({ success: false, error: 'Manifest data is required' });
     }
-    
+
     const { client, type: platformType } = getAIClient(manifest.platformKey);
     let figmaSpec = null;
     if (activeTab === 'Clients Resources') {
@@ -891,9 +923,9 @@ app.post('/api/figma-export', (req, res) => {
         structuredPrompt
       });
     }
-    
+
     const designId = Date.now().toString() + Math.random().toString(36).substring(7);
-    
+
     const data = readData();
     data.figmaExports.push({
       id: designId,
@@ -906,7 +938,7 @@ app.post('/api/figma-export', (req, res) => {
       }
     });
     writeData(data);
-    
+
     res.json({ success: true, designId });
   } catch (err) {
     console.error('[Figma Export ✗] Error:', err);
@@ -919,11 +951,11 @@ app.get('/api/figma-export/:id', (req, res) => {
     const { id } = req.params;
     const data = readData();
     const exportData = data.figmaExports.find(e => e.id === id);
-    
+
     if (!exportData) {
       return res.status(404).json({ success: false, error: 'Design not found' });
     }
-    
+
     res.json({ success: true, designData: exportData.designData });
   } catch (err) {
     console.error('[Figma Export Fetch ✗] Error:', err);

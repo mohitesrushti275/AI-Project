@@ -46,13 +46,10 @@ export async function refinePrompt(client, manifestContext, platformType = 'anth
     referenceUrl,
     multipleReferences,
     clientResourcesSections,
-    contentSource
+    contentSource,
+    contentSummary // NEW: Cached summary
   } = manifestContext;
 
-  // ... (priorityDirective logic remains same)
-  // ... (refinementSystemPrompt logic remains same)
-
-  // (Keeping the logic outside the loop for clarity, but I'll need to define priorityDirective here as well)
   const hasSections = clientResourcesSections && clientResourcesSections.length > 0;
   const hasReference = (referenceUrl && referenceUrl.trim() !== '') || (multipleReferences && multipleReferences.length > 0);
   const hasContent = contentSource && contentSource.trim() !== '';
@@ -60,7 +57,7 @@ export async function refinePrompt(client, manifestContext, platformType = 'anth
   let priorityDirective = '';
   if (hasSections && hasReference && hasContent) {
     priorityDirective = `### LOGIC RULE: [Sections + Reference + Content]
-Incorporate the COMPLETE uploaded content VERBATIM. The UI must be built around the full, unedited text.`;
+Incorporate the provided content effectively. The UI must be built around the specific data points and value propositions.`;
   } else if (hasSections && hasReference) {
     priorityDirective = `### LOGIC RULE: [Sections + Reference]
 Apply the style and structure of the reference website while embedding ALL Added Sections and their specific notes.`;
@@ -78,13 +75,10 @@ You are tasked with providing HYPER-DETAILED, EXHAUSTIVE, and MICROSCOPIC techni
 The output capacity must be maximized: do not be concise, be voluminous and precise.
 Every pixel, interaction, and content piece must be described in elaborate detail.
 
-### VERBATIM CONTENT RULE (ABSOLUTE PRIORITY):
-1. ZERO TOLERANCE FOR SUMMARIZATION: You are strictly forbidden from summarizing, condensing, or rephrasing any part of the "ATTACHED CONTENT REFERENCE".
-2. VERBATIM INJECTION: You MUST copy and paste the entire provided text exactly as it is. If the text is 3000 words, your prompt must contain those 3000 words.
-3. PRESERVE ALL DETAILS: Every feature, benefit, price, and description must be present.
-4. STRUCTURAL INTEGRITY: You may distribute the content across different UI sections, but every single character must be accounted for in the final output.
-5. NO TRUNCATION: If you feel the prompt is included, DO NOT STOP. Continue until every word is included.
-6. FALLBACK LOGIC: If "ATTACHED CONTENT REFERENCE" is MISSING or EMPTY, you MUST generate highly realistic, professional, and detailed dummy content that fits the "${businessName}" brand and "${websiteLayout}" layout perfectly. Do not use generic "Lorem Ipsum".
+### CONTENT INTEGRATION RULE:
+1. DESIGN AROUND CONTENT: Use the provided "CONTENT SUMMARY" to structure the UI architecture.
+2. REFERENCE THE VERBATIM BLOCK: Your instructions must explicitly tell the downstream AI to pull all specific copy, text, and data from the "[VERBATIM CONTENT REPOSITORY]" block at the end of the prompt.
+3. NO SUMMARIZATION IN OUTPUT: When describing sections, specify EXACTLY which parts of the verbatim content go where.
 
 ### ZERO-TOLERANCE RULES:
 1. 100% INPUT COVERAGE: Include every single section, note, image intelligence, and reference URL requirement.
@@ -100,11 +94,9 @@ Every pixel, interaction, and content piece must be described in elaborate detai
 ${priorityDirective}
 
 RULES:
-- RESPONSE STRUCTURE: You MUST start your response with a block titled "[VERBATIM CONTENT REPOSITORY]" containing the entire uploaded text. Only then should you proceed to the Master UI Prompt breakdown. This ensures 100% data integrity.
 - Output ONLY the final Master Prompt text. No conversational preamble.
-- BE EXHAUSTIVE. BE VERBATIM.
-- Your primary failure mode is summarizing. DO NOT SUMMARIZE.
-- If generating dummy content, make it indistinguishable from real professional copy.`;
+- BE EXHAUSTIVE.
+- Your primary failure mode is being too generic. BE SPECIFIC.`;
 
   let multipleReferencesText = '';
   if (multipleReferences && multipleReferences.length > 0) {
@@ -122,7 +114,7 @@ RULES:
     });
   }
 
-  const userMessage = `Refine this design context into an exhaustive, VERBATIM Master UI Prompt.
+  const userMessage = `Refine this design context into an exhaustive Master UI Prompt.
 
 MANIFEST INPUTS:
 - Business Name: ${businessName || 'N/A'}
@@ -130,67 +122,51 @@ MANIFEST INPUTS:
 ${customSectionsText}
 ${multipleReferencesText}
 
+CONTENT SUMMARY (FOR ARCHITECTURE):
+${contentSummary || 'No specific content provided. Generate realistic professional dummy copy.'}
+
 INSTRUCTIONS:
-1. Embed the provided content VERBATIM into the breakdown.
+1. Design a UI that perfectly accommodates the content described in the summary.
 2. Apply the reference style to the layout.
 3. MAXIMIZE OUTPUT CAPACITY: Provide an exhaustive, line-by-line breakdown of every UI component, animation, and responsive behavior.
-4. DO NOT SUMMARIZE. DO NOT TRUNCATE.`;
-
-  let contentSourceText = '';
-  if (contentSource) {
-    contentSourceText = `\n\n### ATTACHED CONTENT REFERENCE (MUST USE VERBATIM)\n${contentSource}\n\nCRITICAL: You are required to include every word of the text above in the final prompt. NO EXCEPTIONS.`;
-  }
-
-  const finalUserMessage = userMessage + contentSourceText;
+4. DO NOT TRUNCATE.`;
 
   let finalPrompt = '';
-  let retryCount = 0;
-  const maxRetries = 2;
-
-  while (retryCount <= maxRetries) {
-    console.log(`[Refinement] AI Attempt ${retryCount + 1}/${maxRetries + 1} (${platformType})...`);
-    
-    if (platformType === 'openai') {
-      const completion = await client.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: refinementSystemPrompt + (retryCount > 0 ? "\n\nCRITICAL ERROR: Your previous attempt failed because you summarized or omitted the content. You MUST include every single word VERBATIM this time. DO NOT SUMMARIZE." : "") },
-          { role: "user", content: finalUserMessage }
-        ],
-        temperature: retryCount > 0 ? 0.2 : 0.4,
-        max_tokens: 4096, // Note: GPT-4o has smaller output limit than Sonnet in some tiers, but typically fine for prompt refinement
-      });
-      finalPrompt = completion.choices[0].message.content.trim();
-    } else {
-      const completion = await client.messages.create({
-        model: 'claude-3-5-sonnet-latest',
-        max_tokens: 8192,
-        temperature: retryCount > 0 ? 0.2 : 0.4,
-        system: refinementSystemPrompt + (retryCount > 0 ? "\n\nCRITICAL ERROR: Your previous attempt failed because you summarized or omitted the content. You MUST include every single word VERBATIM this time. DO NOT SUMMARIZE." : ""),
-        messages: [{ role: 'user', content: finalUserMessage }]
-      });
-      finalPrompt = completion.content[0].text.trim();
-    }
-
-    if (validateContentFidelity(contentSource, finalPrompt)) {
-      console.log('[Refinement] Integrity check PASSED.');
-      break;
-    } else {
-      console.warn('[Refinement] Integrity check FAILED. Content was summarized or truncated. Retrying with higher pressure...');
-      retryCount++;
-    }
+  
+  // Use a single attempt for speed, as we will manually append content at the end for fidelity
+  console.log(`[Refinement] Generating prompt (${platformType})...`);
+  
+  if (platformType === 'openai') {
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: refinementSystemPrompt },
+        { role: "user", content: userMessage }
+      ],
+      temperature: 0.4,
+      max_tokens: 4000,
+    });
+    finalPrompt = completion.choices[0].message.content.trim();
+  } else {
+    const completion = await client.messages.create({
+      model: 'claude-3-5-sonnet-latest',
+      max_tokens: 4000,
+      temperature: 0.4,
+      system: refinementSystemPrompt,
+      messages: [{ role: 'user', content: userMessage }]
+    });
+    finalPrompt = completion.content[0].text.trim();
   }
 
-  // Final Safety Net: If even after retries the content is missing, manually append it
-  // This ensures the user NEVER gets a truncated prompt for their credits.
-  if (contentSource && contentSource.trim().length > 50 && !validateContentFidelity(contentSource, finalPrompt)) {
-    console.warn('[Refinement] Safety Net Triggered: Manually appending verbatim content to ensure zero truncation.');
-    finalPrompt += `\n\n### FULL VERBATIM CONTENT REFERENCE (GUARANTEED COMPLETENESS)\n${contentSource}\n\n*Note: The AI provided an optimized integration above, but this block contains the 100% verbatim source material as requested.*`;
+  // ENSURE VERBATIM FIDELITY: Manually append the full content repository at the end.
+  // This is much faster than asking the AI to repeat 3000 words.
+  if (contentSource && contentSource.trim().length > 0) {
+    finalPrompt += `\n\n---
+[VERBATIM CONTENT REPOSITORY]
+${contentSource}
+---
+*Note: The architectural breakdown above specifies how to integrate this verbatim text.*`;
   }
 
   return finalPrompt;
 }
-
-
-
-

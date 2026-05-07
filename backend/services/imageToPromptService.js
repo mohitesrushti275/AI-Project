@@ -37,8 +37,8 @@ export async function optimizeScreenshot(base64Image) {
   return optimizedBuffer.toString('base64');
 }
 
-export async function analyzeUI_Image(anthropicClient, optimizedBase64Image, userContext = '') {
-  console.log('[ImageToPromptService] Requesting UI structural analysis from Anthropic...');
+export async function analyzeUI_Image(client, optimizedBase64Image, userContext = '', platformType = 'anthropic') {
+  console.log(`[ImageToPromptService] Requesting UI structural analysis from ${platformType}...`);
   
   const userMessageContent = userContext 
     ? `Analyze this complete website screenshot and output the structured JSON intel required to rebuild its frontend design system.
@@ -52,33 +52,60 @@ INSTRUCTIONS:
 - Use the CRITICAL OVERRIDES for COLORS, TYPOGRAPHY, and BRAND IDENTITY.`
     : 'Analyze this complete website screenshot and output the structured JSON intel required to rebuild its frontend design system.';
 
-  const completion = await anthropicClient.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 4096,
-    temperature: 0.2,
-    system: UI_ANALYSIS_SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: userMessageContent
-          },
-          {
-             type: 'image',
-             source: {
-               type: 'base64',
-               media_type: 'image/jpeg',
-               data: optimizedBase64Image,
-             }
-          }
-        ]
-      }
-    ]
-  });
+  let rawContent = '';
 
-  const rawContent = completion.content[0].text.trim();
+  if (platformType === 'openai') {
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: UI_ANALYSIS_SYSTEM_PROMPT
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: userMessageContent },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${optimizedBase64Image}`,
+              },
+            },
+          ],
+        },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 4096,
+    });
+    rawContent = completion.choices[0].message.content;
+  } else {
+    const completion = await client.messages.create({
+      model: 'claude-3-5-sonnet-latest',
+      max_tokens: 4096,
+      temperature: 0.2,
+      system: UI_ANALYSIS_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: userMessageContent },
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: 'image/jpeg',
+                data: optimizedBase64Image,
+              }
+            }
+          ]
+        }
+      ]
+    });
+    rawContent = completion.content[0].text;
+  }
+
+  rawContent = rawContent.trim();
   
   // JSON Extraction Strategies
   let jsonStr = rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();

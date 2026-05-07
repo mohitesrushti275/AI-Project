@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Layout, Save, X, ChevronRight, Package, Home, Upload, Code as CodeIcon, Terminal } from 'lucide-react';
+import { Plus, Edit2, Trash2, Layout, ChevronRight, Package, Upload, Code as CodeIcon, Terminal } from 'lucide-react';
 
 
 interface Subsection {
@@ -147,7 +147,7 @@ export default function AdminApp() {
       if (res.ok) {
         setIsAddingSection(false);
         setEditingSectionId(null);
-        setNewSection({ title: '', prompt: '', code: '', image: '' });
+        setNewSection({ title: '', prompt: '', code: '', image: '', figmaUrl: '' });
         await fetchComponents();
       }
     } catch (err) {
@@ -161,7 +161,8 @@ export default function AdminApp() {
       title: sub.title,
       prompt: sub.prompt || '',
       code: sub.code || '',
-      image: sub.image || ''
+      image: sub.image || '',
+      figmaUrl: sub.figmaUrl || ''
     });
     setIsAddingSection(true);
   };

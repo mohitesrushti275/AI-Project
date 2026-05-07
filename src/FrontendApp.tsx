@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import type { ChangeEvent } from 'react';
-import { Copy, Wand2, RefreshCw, X, Download, Code as CodeIcon, FileText, Layout, ImageIcon, LayoutGrid, Upload, GripVertical, Plus } from 'lucide-react';
+import { Copy, Wand2, X, Download, Code as CodeIcon, FileText, Layout, ImageIcon, LayoutGrid, Upload, GripVertical, Plus } from 'lucide-react';
 import { Reorder } from 'framer-motion';
 
 
@@ -9,13 +8,7 @@ interface AnalysisResult {
   prompts: Record<string, string>;
 }
 
-interface PromptHistoryItem {
-  id: string;
-  prompt: string;
-  timestamp: number;
-  wordCount: number;
-  charCount: number;
-}
+
 
 interface GalleryItem {
   id: string;
@@ -33,52 +26,9 @@ interface ComponentData {
   count: number;
 }
 
-const STORAGE_KEY = 'prompt_history';
-const ITEMS_PER_PAGE = 4;
 
-function loadHistory(): PromptHistoryItem[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  } catch {
-    return [];
-  }
-}
 
-function saveHistory(history: PromptHistoryItem[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-}
 
-// ── Recent Prompts Section ────────────────────────────────────────────────────
-function RecentPrompts({ history, onSelect }: { history: PromptHistoryItem[]; onSelect: (p: string) => void }) {
-  const [page, setPage] = useState(1);
-  if (history.length === 0) return null;
-  const totalPages = Math.ceil(history.length / ITEMS_PER_PAGE);
-  const start = (page - 1) * ITEMS_PER_PAGE;
-  const items = history.slice(start, start + ITEMS_PER_PAGE);
-
-  return (
-    <div style={{ width: '100%', marginTop: '64px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '28px' }}>
-        <FileText size={14} color="var(--text-secondary)" />
-        <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>Recent Prompts</span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: 'var(--surface)', border: '1px solid var(--border)', fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>{history.length}</span>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px', background: 'var(--border)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
-        {items.map((item) => (
-          <div key={item.id} onClick={() => onSelect(item.prompt)} className="history-card" style={{ background: 'var(--surface)', padding: '20px 24px 24px', cursor: 'pointer', transition: 'background 0.15s' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-              <FileText size={13} color="var(--text-secondary)" />
-              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{item.wordCount} words</span>
-              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{item.charCount} chars</span>
-            </div>
-            <p style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: '1.65', display: '-webkit-box', WebkitLineClamp: 6, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.prompt}</p>
-          </div>
-        ))}
-        {items.length % 2 !== 0 && <div style={{ background: 'var(--surface)' }} />}
-      </div>
-    </div>
-  );
-}
 
 // ── Sidebar Component ─────────────────────────────────────────────────────────
 function Sidebar({ activeTab, onTabSelect, components }: { activeTab: string; onTabSelect: (tab: string) => void; components: ComponentData[] }) {
@@ -286,7 +236,8 @@ const DesignManifestPreview = ({
   onTransform,
   isTransforming,
   figmaUrl,
-  onPreviewFigma
+  onPreviewFigma,
+  onExportMD
 }: {
   generatedPrompt: string;
   contentSource: string;
@@ -298,6 +249,7 @@ const DesignManifestPreview = ({
   isTransforming?: boolean;
   figmaUrl?: string;
   onPreviewFigma?: () => void;
+  onExportMD?: () => void;
 }) => {
   const [activeTab, setActiveTab] = useState<'prompt' | 'source' | 'screenshot' | 'json' | 'devspec'>('prompt');
 
@@ -451,22 +403,21 @@ const DesignManifestPreview = ({
         flexDirection: 'column'
       }}>
         <div style={{
-          padding: '32px',
-          overflowY: 'auto',
-          flex: 1,
-          maxHeight: 'calc(100vh - 280px)',
+          height: '680px',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
         }}>
           {activeTab === 'prompt' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               {contentFileName && (
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '12px',
-                  padding: '12px 16px',
+                  padding: '24px 32px 16px',
                   background: 'rgba(51, 104, 247, 0.05)',
-                  border: '1px solid rgba(51, 104, 247, 0.1)',
-                  borderRadius: '10px'
+                  borderBottom: '1px solid rgba(51, 104, 247, 0.1)',
                 }}>
                   <FileText size={16} style={{ color: '#3368F7' }} />
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -482,12 +433,15 @@ const DesignManifestPreview = ({
                   lineHeight: 1.7,
                   fontFamily: 'var(--font-mono)',
                   whiteSpace: 'pre-wrap',
+                  textAlign: 'left',
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
                   width: '100%',
-                  minHeight: '300px',
-                  resize: 'vertical'
+                  flex: 1,
+                  padding: '16px 32px 32px',
+                  resize: 'none',
+                  overflowY: 'auto'
                 }}
                 key={generatedPrompt}
                 defaultValue={generatedPrompt || "No text prompt generated for this website. See Screenshot or JSON Schema."}
@@ -518,9 +472,12 @@ const DesignManifestPreview = ({
                 lineHeight: 1.7,
                 fontFamily: 'var(--font-mono)',
                 whiteSpace: 'pre-wrap',
+                textAlign: 'left',
                 background: 'rgba(0,0,0,0.2)',
-                padding: '20px',
-                borderRadius: '12px'
+                padding: '32px',
+                borderRadius: '12px',
+                flex: 1,
+                overflowY: 'auto'
               }}>
                 {contentSource || 'Binary content detected (PDF/Word). The text will be extracted and integrated during the generation process.'}
               </p>
@@ -542,14 +499,16 @@ const DesignManifestPreview = ({
                   lineHeight: 1.7,
                   fontFamily: 'var(--font-mono)',
                   whiteSpace: 'pre-wrap',
+                  textAlign: 'left',
                   background: 'rgba(0,0,0,0.2)',
                   border: '1px solid var(--border)',
                   outline: 'none',
-                  padding: '20px',
+                  padding: '32px',
                   borderRadius: '12px',
                   width: '100%',
-                  minHeight: '300px',
-                  resize: 'vertical'
+                  flex: 1,
+                  overflowY: 'auto',
+                  resize: 'none'
                 }}
                 key={structuredPrompt ? JSON.stringify(structuredPrompt).length : 'json'}
                 defaultValue={JSON.stringify(structuredPrompt, null, 2)}
@@ -599,11 +558,12 @@ const DesignManifestPreview = ({
           background: 'rgba(0,0,0,0.1)',
           display: 'flex',
           gap: '12px',
-          alignItems: 'center'
+          alignItems: 'center',
+          justifyContent: 'flex-start'
         }}>
           <button
             className="action-btn"
-            style={{ width: 'fit-content', marginTop: 0 }}
+            style={{ width: 'fit-content', marginTop: 0, height: '44px', padding: '0 20px', fontSize: '13px' }}
             onClick={() => {
               if (activeTab === 'prompt') navigator.clipboard.writeText(generatedPrompt);
               else if (activeTab === 'source') navigator.clipboard.writeText(contentSource);
@@ -618,7 +578,7 @@ const DesignManifestPreview = ({
           {(onPreviewFigma || figmaUrl) && (
             <button
               className="action-btn secondary"
-              style={{ width: 'fit-content', marginTop: 0, height: '44px' }}
+              style={{ width: 'fit-content', marginTop: 0, height: '44px', padding: '0 20px', fontSize: '13px' }}
               onClick={() => {
                 if (onPreviewFigma) onPreviewFigma();
                 else if (figmaUrl) window.open(figmaUrl, '_blank');
@@ -627,6 +587,18 @@ const DesignManifestPreview = ({
             >
               <Layout size={14} style={{ marginRight: '8px' }} />
               Preview In Figma
+            </button>
+          )}
+          
+          {onExportMD && (
+            <button
+              className="action-btn secondary"
+              style={{ width: 'fit-content', marginTop: 0, height: '44px', padding: '0 20px', fontSize: '13px' }}
+              onClick={onExportMD}
+              disabled={!generatedPrompt}
+            >
+              <FileText size={14} style={{ marginRight: '8px' }} />
+              Download design.md
             </button>
           )}
         </div>
@@ -668,23 +640,21 @@ export default function FrontendApp() {
     websiteLayout: 'Landing Page',
     sectionType: ['Hero Section'],
     themeMode: 'Dark',
-    referenceUrls: [],
-    clientResourcesWebsites: [],
+    referenceUrls: [] as string[],
+    clientResourcesWebsites: [] as { url: string; description: string }[],
     clientResourcesSections: [] as any[],
     contentSource: '',
     contentFile: null as File | null,
     contentFileName: '',
     sectionOrder: ['Hero Section'],
     manifestId: null as string | null,
-    figmaUrl: ''
+    figmaUrl: '',
+    platformKey: 'Anthropic'
   });
 
   const [urlInput, setUrlInput] = useState('');
   const [isScopeDropdownOpen, setIsScopeDropdownOpen] = useState(false);
-  const [newUrlInput, setNewUrlInput] = useState('');
-  const [newUrlDesc, setNewUrlDesc] = useState('');
-  const [newUrlFocus, setNewUrlFocus] = useState('Full website');
-  const [isAddingUrl, setIsAddingUrl] = useState(false);
+
   const scopeDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -715,12 +685,13 @@ export default function FrontendApp() {
         contentSource: '',
         contentFile: null,
         contentFileName: '',
+        platformKey: 'Anthropic'
       }));
     }
   }, [activeTab]);
 
   const [generatedPrompt, setGeneratedPrompt] = useState('');
-  const isGenerated = !!generatedPrompt;
+
   const [referenceScreenshot, setReferenceScreenshot] = useState<string | null>(null);
   const [structuredPromptResult, setStructuredPromptResult] = useState<any>(null);
   const [devSpecResult, setDevSpecResult] = useState<any>(null);
@@ -749,7 +720,7 @@ export default function FrontendApp() {
 
 
 
-  const [isGeneratingManifest, setIsGeneratingManifest] = useState(false);
+
 
   const handleGenerateFromReference = async () => {
     const primaryUrl = manifest.referenceUrls[0] || urlInput.trim();
@@ -807,6 +778,7 @@ export default function FrontendApp() {
       formData.append('bodyFont', manifest.bodyFont || '');
       formData.append('websiteLayout', manifest.websiteLayout || '');
       formData.append('themeMode', manifest.themeMode || 'Dark');
+      formData.append('platformKey', manifest.platformKey || 'Anthropic');
 
       if (manifest.contentFile) {
         formData.append('contentFile', manifest.contentFile);
@@ -865,6 +837,73 @@ export default function FrontendApp() {
     } finally {
       setIsExportingToFigma(false);
     }
+  };
+
+  const handleExportMD = () => {
+    if (!generatedPrompt) return;
+
+    const sections = manifest.clientResourcesSections || [];
+    const references = manifest.clientResourcesWebsites || [];
+    
+    const mdContent = `# Homepage Design Specification
+
+## Project Overview
+- Page: Homepage
+- Source: Client Resources
+- Theme: ${manifest.themeMode}
+- Layout: ${manifest.websiteLayout}
+- Style: Follow reference website look and feel
+
+## Brand Identity
+- Colors:
+  - Primary: ${manifest.primaryColor}
+  - Secondary: ${manifest.secondaryColor}
+- Fonts:
+  - Heading: ${manifest.headingFont}
+  - Body: ${manifest.bodyFont}
+
+## Reference Websites
+${references.length > 0 ? references.map((r: any) => `
+- URL: ${r.url || "N/A"}
+- Notes:
+  - ${r.description || "No specific notes provided."}
+  - Follow layout structure, spacing, and visual hierarchy
+  - Use similar typography scale and component styling
+`).join("\n") : "- No reference websites provided."}
+
+## Sections
+${sections.length > 0 ? sections.map((s: any, i: number) => `
+### ${i + 1}. ${s.type || "Untitled Section"}
+- Layout: ${s.type === 'Hero Section' ? 'Full-width layout' : 'Standard section layout'}
+- Notes: ${s.description || "N/A"}
+- Image: ${s.imageFile ? s.imageFile.name : (s.imageUrl || "N/A")}
+- Content: ${s.content || manifest.contentSource || "Realistic dummy content based on " + (manifest.businessName || "the brand")}
+- Strategy: Follow reference style and spacing
+`).join("\n") : "- No sections defined."}
+
+## Behavior Rules
+- Follow reference website look and feel
+- Combine section notes and reference notes
+- Use uploaded content where available
+- Use dummy content if not available
+- Do not introduce new components
+- Do not change existing functionality
+- Maintain current UI structure
+
+## Generated Prompt
+
+${generatedPrompt}
+`;
+
+    const blob = new Blob([mdContent], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "design.md";
+    a.click();
+
+    URL.revokeObjectURL(url);
   };
 
   // handleGeneratePrompt removed in favor of unified handleGenerateFromReference
@@ -944,7 +983,7 @@ export default function FrontendApp() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
-  const [history, setHistory] = useState<PromptHistoryItem[]>(loadHistory);
+
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -1541,6 +1580,21 @@ export default function FrontendApp() {
                           </button>
                         </div>
                       </div>
+
+                      <div className="manifest-section">
+                        <div className="step-header">
+                          <div className="step-number">10</div>
+                          <span>Select Platform Key</span>
+                        </div>
+                        <select
+                          className="manifest-input"
+                          value={manifest.platformKey}
+                          onChange={e => setManifest({ ...manifest, platformKey: e.target.value })}
+                        >
+                          <option value="Anthropic">Anthropic</option>
+                          <option value="Open AI">Open AI</option>
+                        </select>
+                      </div>
                     </>
                   ) : (
                     <>
@@ -1570,9 +1624,24 @@ export default function FrontendApp() {
                         </div>
                       </div>
 
-                      <div className="manifest-section" style={{ width: '100%', display: 'none' }}>
+                      <div className="manifest-section">
                         <div className="step-header">
                           <div className="step-number">09</div>
+                          <span>Select Platform Key</span>
+                        </div>
+                        <select
+                          className="manifest-input"
+                          value={manifest.platformKey}
+                          onChange={e => setManifest({ ...manifest, platformKey: e.target.value })}
+                        >
+                          <option value="Anthropic">Anthropic</option>
+                          <option value="Open AI">Open AI</option>
+                        </select>
+                      </div>
+
+                      <div className="manifest-section" style={{ width: '100%', display: 'none' }}>
+                        <div className="step-header">
+                          <div className="step-number">11</div>
                           <span>Content Source</span>
                         </div>
                         <label className={`content-drop-zone ${manifest.contentFile ? 'active' : ''}`}>
@@ -1649,13 +1718,14 @@ export default function FrontendApp() {
                     generatedPrompt={generatedPrompt}
                     contentSource={manifest.contentSource}
                     contentFileName={manifest.contentFileName}
-                    screenshotUrl={referenceScreenshot}
+                    screenshotUrl={referenceScreenshot ?? undefined}
                     structuredPrompt={structuredPromptResult}
                     devSpecResult={devSpecResult}
                     onTransform={handleTransform}
                     isTransforming={isTransforming}
                     figmaUrl={manifest.figmaUrl}
                     onPreviewFigma={activeTab === 'Clients Resources' ? handlePreviewFigma : undefined}
+                    onExportMD={activeTab === 'Clients Resources' ? handleExportMD : undefined}
                   />
                 </div>
               </div>

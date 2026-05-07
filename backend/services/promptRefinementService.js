@@ -29,8 +29,8 @@ function validateContentFidelity(inputContent, generatedPrompt) {
   return hasStart && hasMid && hasEnd;
 }
 
-export async function refinePrompt(anthropicClient, manifestContext) {
-  console.log('[PromptRefinementService] Refining Master UI Prompt with Claude (Logic v2026 - Integrity Mode)...');
+export async function refinePrompt(client, manifestContext, platformType = 'anthropic') {
+  console.log(`[PromptRefinementService] Refining Master UI Prompt with ${platformType}...`);
 
   const {
     businessName,
@@ -49,7 +49,10 @@ export async function refinePrompt(anthropicClient, manifestContext) {
     contentSource
   } = manifestContext;
 
-  // ── Determine Active Logic Rule ───────────────────────────────────────────
+  // ... (priorityDirective logic remains same)
+  // ... (refinementSystemPrompt logic remains same)
+
+  // (Keeping the logic outside the loop for clarity, but I'll need to define priorityDirective here as well)
   const hasSections = clientResourcesSections && clientResourcesSections.length > 0;
   const hasReference = (referenceUrl && referenceUrl.trim() !== '') || (multipleReferences && multipleReferences.length > 0);
   const hasContent = contentSource && contentSource.trim() !== '';
@@ -145,17 +148,29 @@ INSTRUCTIONS:
   const maxRetries = 2;
 
   while (retryCount <= maxRetries) {
-    console.log(`[Refinement] AI Attempt ${retryCount + 1}/${maxRetries + 1}...`);
+    console.log(`[Refinement] AI Attempt ${retryCount + 1}/${maxRetries + 1} (${platformType})...`);
     
-    const completion = await anthropicClient.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 8192,
-      temperature: retryCount > 0 ? 0.2 : 0.4,
-      system: refinementSystemPrompt + (retryCount > 0 ? "\n\nCRITICAL ERROR: Your previous attempt failed because you summarized or omitted the content. You MUST include every single word VERBATIM this time. DO NOT SUMMARIZE." : ""),
-      messages: [{ role: 'user', content: finalUserMessage }]
-    });
-
-    finalPrompt = completion.content[0].text.trim();
+    if (platformType === 'openai') {
+      const completion = await client.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: refinementSystemPrompt + (retryCount > 0 ? "\n\nCRITICAL ERROR: Your previous attempt failed because you summarized or omitted the content. You MUST include every single word VERBATIM this time. DO NOT SUMMARIZE." : "") },
+          { role: "user", content: finalUserMessage }
+        ],
+        temperature: retryCount > 0 ? 0.2 : 0.4,
+        max_tokens: 4096, // Note: GPT-4o has smaller output limit than Sonnet in some tiers, but typically fine for prompt refinement
+      });
+      finalPrompt = completion.choices[0].message.content.trim();
+    } else {
+      const completion = await client.messages.create({
+        model: 'claude-3-5-sonnet-latest',
+        max_tokens: 8192,
+        temperature: retryCount > 0 ? 0.2 : 0.4,
+        system: refinementSystemPrompt + (retryCount > 0 ? "\n\nCRITICAL ERROR: Your previous attempt failed because you summarized or omitted the content. You MUST include every single word VERBATIM this time. DO NOT SUMMARIZE." : ""),
+        messages: [{ role: 'user', content: finalUserMessage }]
+      });
+      finalPrompt = completion.content[0].text.trim();
+    }
 
     if (validateContentFidelity(contentSource, finalPrompt)) {
       console.log('[Refinement] Integrity check PASSED.');

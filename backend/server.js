@@ -54,21 +54,36 @@ function writeData(data) {
 const anthropicKey = (process.env.ANTHROPIC_API_KEY || '').trim();
 if (!anthropicKey) {
   console.error('[FATAL] ANTHROPIC_API_KEY is missing.');
-  process.exit(1);
+}
+
+const openAIKey = (process.env.OPENAI_API_KEY || '').trim();
+if (!openAIKey) {
+  console.warn('[WARN] OPENAI_API_KEY is missing. OpenAI features will be unavailable.');
 }
 
 // Security-safe diagnostic logging
-console.log(`[AUTH] Anthropic Key Loaded | Length: ${anthropicKey.length} | Format: ${anthropicKey.slice(0, 12)}...${anthropicKey.slice(-4)}`);
+console.log(`[AUTH] Anthropic Key Loaded | Length: ${anthropicKey.length}`);
+console.log(`[AUTH] OpenAI Key Loaded | Length: ${openAIKey.length}`);
 
-console.log(`[AUTH] Final Key Check | Length: ${anthropicKey.length} | Start: ${anthropicKey.slice(0, 15)} | End: ${anthropicKey.slice(-10)}`);
-const anthropic = new Anthropic({ 
-  apiKey: anthropicKey,
-});
+const anthropic = anthropicKey ? new Anthropic({ apiKey: anthropicKey }) : null;
+const openai = openAIKey ? new OpenAI({ apiKey: openAIKey }) : null;
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
+
+// ── AI Helper ──────────────────────────────────────────────────────────────
+function getAIClient(platformKey) {
+  const normalizedKey = (platformKey || 'Anthropic').trim();
+  if (normalizedKey === 'Open AI') {
+    if (!openai) throw new Error('OpenAI client not initialized. Please check your OPENAI_API_KEY in .env');
+    return { client: openai, type: 'openai' };
+  }
+  // Default to Anthropic
+  if (!anthropic) throw new Error('Anthropic client not initialized. Please check your ANTHROPIC_API_KEY in .env');
+  return { client: anthropic, type: 'anthropic' };
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -438,12 +453,12 @@ app.post('/api/generate-manifest', async (req, res) => {
     const { 
       businessName, primaryColor, secondaryColor, headingFont, bodyFont, 
       websiteLayout, sectionType, referenceUrls, contentSource, sectionOrder,
-      themeMode 
+      themeMode, platformKey 
     } = req.body;
     
-    if (!anthropic) throw new Error('Anthropic client not initialized');
+    const { client, type: platformType } = getAIClient(platformKey);
 
-    console.log(`[Manifest] Generating architecture for ${businessName || 'A Modern Business'} in ${themeMode} mode...`);
+    console.log(`[Manifest] Generating architecture for ${businessName || 'A Modern Business'} in ${themeMode} mode using ${platformType}...`);
 
     const referencesText = referenceUrls && referenceUrls.length > 0 
       ? `\nReference Websites for Design Inspiration: ${referenceUrls.join(', ')}`
@@ -451,43 +466,58 @@ app.post('/api/generate-manifest', async (req, res) => {
 
     const contentContext = contentSource ? `\n\n### ATTACHED CONTENT SOURCE (USE VERBATIM):\n${contentSource}\n\n` : '';
 
-    const completion = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      temperature: 0.7,
-      system: `You are an elite Digital Architect and AI Prompt Engineer. Your task is to generate a comprehensive "Website Generation Master Prompt".
-      
-Goal: Create a technical Master Prompt that includes a direct reference to the source material.
-
-CRITICAL INSTRUCTIONS:
-1. REFERENCE THE ATTACHMENT: Your technical instructions should explicitly tell the downstream AI to look at the "### ATTACHED CONTENT REFERENCE" section at the end of the prompt for specific copy and data.
-2. SECTION ARCHITECTURE: Map the User's selected Section Order to the design tokens provided (colors, fonts).
-3. CONTENT APPENDING: At the absolute end of your response, after your technical instructions, provide a divider '---' followed by a section titled '### ATTACHED CONTENT REFERENCE'. Inside this section, you MUST INCLUDE the core data and relevant text from the user's uploaded document. Do not omit this section.
-4. INTEGRITY: Ensure the technical instructions and the attached reference are delivered as a single, unified text package.
-5. THEME ADHERENCE: Strictly follow the user's requested Visual Theme mode (Dark or Light).`,
-      messages: [
-        {
-          role: 'user',
-          content: `Generate a technical, inspiration-rich Master Prompt (approx 500-800 words) that describes how to build this specific website based on the following:
-          
-Business Name: ${businessName || 'A Modern Business'}
-Website Category: ${websiteLayout}
-Visual Theme: ${themeMode} Mode
-Detailed Section Order: ${sectionOrder || sectionType}
-Brand Palette: Primary (${primaryColor}), Secondary (${secondaryColor})
-Typography: Headings (${headingFont}), Body (${bodyFont})${referencesText}${contentContext}
-
-REQUIREMENTS:
-1. Technical architectural instructions for a developer AI.
-2. Ensure the design system (backgrounds, text contrast, component variants) strictly reflects the **${themeMode} Mode** request.
-3. At the very end of your response, after a divider line '---', append a section titled '### ATTACHED CONTENT REFERENCE' containing the filtered, relevant data from the source material.
-4. The instructions MUST explicitly tell the developer to look at the '### ATTACHED CONTENT REFERENCE' section for all specific copy.`
-        }
-      ]
-    });
+    let promptResult = '';
+    if (platformType === 'openai') {
+      const completion = await client.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "You are an elite Digital Architect and AI Prompt Engineer. Your task is to generate a comprehensive 'Website Generation Master Prompt'.\n\nGoal: Create a technical Master Prompt that includes a direct reference to the source material.\n\nCRITICAL INSTRUCTIONS:\n1. REFERENCE THE ATTACHMENT: Your technical instructions should explicitly tell the downstream AI to look at the '### ATTACHED CONTENT REFERENCE' section at the end of the prompt for specific copy and data.\n2. SECTION ARCHITECTURE: Map the User's selected Section Order to the design tokens provided (colors, fonts).\n3. CONTENT APPENDING: At the absolute end of your response, after your technical instructions, provide a divider '---' followed by a section titled '### ATTACHED CONTENT REFERENCE'. Inside this section, you MUST INCLUDE the core data and relevant text from the user's uploaded document. Do not omit this section.\n4. INTEGRITY: Ensure the technical instructions and the attached reference are delivered as a single, unified text package.\n5. THEME ADHERENCE: Strictly follow the user's requested Visual Theme mode (Dark or Light)." },
+          { role: "user", content: `Generate a technical, inspiration-rich Master Prompt (approx 500-800 words) that describes how to build this specific website based on the following:\n\nBusiness Name: ${businessName || 'A Modern Business'}\nWebsite Category: ${websiteLayout}\nVisual Theme: ${themeMode} Mode\nDetailed Section Order: ${sectionOrder || sectionType}\nBrand Palette: Primary (${primaryColor}), Secondary (${secondaryColor})\nTypography: Headings (${headingFont}), Body (${bodyFont})${referencesText}${contentContext}\n\nREQUIREMENTS:\n1. Technical architectural instructions for a developer AI.\n2. Ensure the design system (backgrounds, text contrast, component variants) strictly reflects the **${themeMode} Mode** request.\n3. At the very end of your response, after a divider line '---', append a section titled '### ATTACHED CONTENT REFERENCE' containing the filtered, relevant data from the source material.\n4. The instructions MUST explicitly tell the developer to look at the '### ATTACHED CONTENT REFERENCE' section for all specific copy.` }
+        ],
+        temperature: 0.7,
+        max_tokens: 4096
+      });
+      promptResult = completion.choices[0].message.content;
+    } else {
+      const completion = await client.messages.create({
+        model: 'claude-3-5-sonnet-latest',
+        max_tokens: 4096,
+        temperature: 0.7,
+        system: `You are an elite Digital Architect and AI Prompt Engineer. Your task is to generate a comprehensive "Website Generation Master Prompt".
+        
+  Goal: Create a technical Master Prompt that includes a direct reference to the source material.
+  
+  CRITICAL INSTRUCTIONS:
+  1. REFERENCE THE ATTACHMENT: Your technical instructions should explicitly tell the downstream AI to look at the "### ATTACHED CONTENT REFERENCE" section at the end of the prompt for specific copy and data.
+  2. SECTION ARCHITECTURE: Map the User's selected Section Order to the design tokens provided (colors, fonts).
+  3. CONTENT APPENDING: At the absolute end of your response, after your technical instructions, provide a divider '---' followed by a section titled '### ATTACHED CONTENT REFERENCE'. Inside this section, you MUST INCLUDE the core data and relevant text from the user's uploaded document. Do not omit this section.
+  4. INTEGRITY: Ensure the technical instructions and the attached reference are delivered as a single, unified text package.
+  5. THEME ADHERENCE: Strictly follow the user's requested Visual Theme mode (Dark or Light).`,
+        messages: [
+          {
+            role: 'user',
+            content: `Generate a technical, inspiration-rich Master Prompt (approx 500-800 words) that describes how to build this specific website based on the following:
+            
+  Business Name: ${businessName || 'A Modern Business'}
+  Website Category: ${websiteLayout}
+  Visual Theme: ${themeMode} Mode
+  Detailed Section Order: ${sectionOrder || sectionType}
+  Brand Palette: Primary (${primaryColor}), Secondary (${secondaryColor})
+  Typography: Headings (${headingFont}), Body (${bodyFont})${referencesText}${contentContext}
+  
+  REQUIREMENTS:
+  1. Technical architectural instructions for a developer AI.
+  2. Ensure the design system (backgrounds, text contrast, component variants) strictly reflects the **${themeMode} Mode** request.
+  3. At the very end of your response, after a divider line '---', append a section titled '### ATTACHED CONTENT REFERENCE' containing the filtered, relevant data from the source material.
+  4. The instructions MUST explicitly tell the developer to look at the '### ATTACHED CONTENT REFERENCE' section for all specific copy.`
+          }
+        ]
+      });
+      promptResult = completion.content[0].text;
+    }
 
     res.json({ 
-      prompt: completion.content[0].text.trim(),
+      prompt: promptResult.trim(),
       sourceMaterial: contentSource || ''
     });
   } catch (error) {
@@ -500,8 +530,10 @@ app.post('/api/design-manifest/reference-to-prompt', async (req, res) => {
   try {
     const { 
       referenceUrl, sections, businessName, primaryColor, secondaryColor, 
-      headingFont, bodyFont, websiteLayout, themeMode, sectionOrder 
+      headingFont, bodyFont, websiteLayout, themeMode, sectionOrder, platformKey 
     } = req.body;
+
+    const { client, type: platformType } = getAIClient(platformKey);
     
     if (!referenceUrl) {
       return res.status(400).json({ success: false, error: 'referenceUrl is required' });
@@ -534,7 +566,7 @@ Theme Mode: ${themeMode || 'Dark'}
     // 3. Analyze with Anthropic
     let aiAnalysis;
     try {
-      aiAnalysis = await analyzeUI_Image(anthropic, optimizedBase64, userContext);
+      aiAnalysis = await analyzeUI_Image(client, optimizedBase64, userContext, platformType);
     } catch (err) {
       return res.status(502).json({ success: false, error: 'AI Analysis failed: Malformed JSON or processing error.' });
     }
@@ -601,8 +633,10 @@ app.post('/api/design-manifest/generate-from-reference', (req, res, next) => {
     const { 
       referenceUrl, activeTab, manifestId, businessName, websiteLayout, 
       themeMode, primaryColor, secondaryColor,
-      headingFont, bodyFont
+      headingFont, bodyFont, platformKey
     } = req.body;
+
+    const { client, type: platformType } = getAIClient(platformKey);
 
     // Fix: Robust JSON parsing for references and sections
     const referenceWebsites = req.body.referenceWebsites ? (typeof req.body.referenceWebsites === 'string' ? JSON.parse(req.body.referenceWebsites) : req.body.referenceWebsites) : [];
@@ -669,7 +703,7 @@ ATTENTION CLAUDE: This specific reference website should be used primarily for:
 Description provided by user: "${ref.description}"
 Please extract design intelligence ONLY relevant to this description.`.trim();
 
-            const analysis = await analyzeUI_Image(anthropic, oBase64, userContext);
+            const analysis = await analyzeUI_Image(client, oBase64, userContext, platformType);
             allAnalyses.push({ ...analysis, ...ref });
             
             // Use the first screenshot as the visual representative in the UI
@@ -694,7 +728,7 @@ ATTENTION CLAUDE: This image is specifically for the "${sec.type}" section.
 User Description: "${sec.description || 'N/A'}"
 Please extract design intelligence ONLY relevant to this section and description.`.trim();
 
-              const analysis = await analyzeUI_Image(anthropic, sec.imageBase64, userContext);
+              const analysis = await analyzeUI_Image(client, sec.imageBase64, userContext, platformType);
               allAnalyses.push({ ...analysis, sectionType: sec.type, description: sec.description, source: 'Custom Section Image' });
               if (!optimizedBase64) optimizedBase64 = sec.imageBase64;
             } catch (err) {
@@ -742,7 +776,7 @@ Theme Mode: ${themeMode || 'Dark'}
 `.trim();
 
       try {
-        aiAnalysis = await analyzeUI_Image(anthropic, optimizedBase64, userContext);
+        aiAnalysis = await analyzeUI_Image(client, optimizedBase64, userContext, platformType);
       } catch (err) {
         return res.status(502).json({ success: false, error: 'AI Analysis failed: Malformed JSON or processing error.' });
       }
@@ -768,7 +802,7 @@ Theme Mode: ${themeMode || 'Dark'}
       contentSource
     };
 
-    const refinedPrompt = await refinePrompt(anthropic, context);
+    const refinedPrompt = await refinePrompt(client, context, platformType);
 
     // Step 6: Package output
     const structuredPrompt = {
@@ -801,7 +835,7 @@ Theme Mode: ${themeMode || 'Dark'}
       themeMode,
       analysisMetadata: {
         timestamp: new Date().toISOString(),
-        engine: 'claude-sonnet-4-6'
+        engine: platformType === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet-latest'
       }
     });
 
@@ -842,9 +876,10 @@ app.post('/api/figma-export', (req, res) => {
       return res.status(400).json({ success: false, error: 'Manifest data is required' });
     }
     
+    const { client, type: platformType } = getAIClient(manifest.platformKey);
     let figmaSpec = null;
     if (activeTab === 'Clients Resources') {
-      figmaSpec = await generateFigmaSpec(anthropic, {
+      figmaSpec = await generateFigmaSpec(client, {
         businessName: manifest.businessName,
         primaryColor: manifest.primaryColor,
         secondaryColor: manifest.secondaryColor,

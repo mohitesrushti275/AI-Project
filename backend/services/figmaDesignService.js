@@ -2,21 +2,10 @@
  * Service to generate a Figma-ready design specification from the Master UI Prompt and Manifest.
  */
 
-export async function generateFigmaSpec(anthropicClient, designContext) {
-  console.log('[FigmaDesignService] Generating Figma Component Specification...');
+export async function generateFigmaSpec(client, designContext, platformType = 'anthropic') {
+  console.log(`[FigmaDesignService] Generating Figma Component Specification with ${platformType}...`);
 
-  const {
-    businessName,
-    primaryColor,
-    secondaryColor,
-    headingFont,
-    bodyFont,
-    websiteLayout,
-    themeMode,
-    generatedPrompt, // The Master UI Prompt
-    structuredPrompt // The base AI analysis
-  } = designContext;
-
+  // ... (FIGMA_SPEC_SYSTEM_PROMPT remains same)
   const FIGMA_SPEC_SYSTEM_PROMPT = `You are a Figma Component Architect. 
 Your goal is to translate a detailed Master UI Prompt into a structured JSON design specification that a Figma plugin can use to build an editable layout.
 
@@ -50,6 +39,18 @@ Return ONLY a valid JSON object with this structure:
 3. ATOMIC: Break down each section into its constituent elements.
 4. NO MARKDOWN: Return only the JSON object.`;
 
+  const {
+    businessName,
+    primaryColor,
+    secondaryColor,
+    headingFont,
+    bodyFont,
+    websiteLayout,
+    themeMode,
+    generatedPrompt, // The Master UI Prompt
+    structuredPrompt // The base AI analysis
+  } = designContext;
+
   const userMessage = `Convert this Master UI Prompt into a Figma Plugin JSON specification.
 
 BUSINESS: ${businessName}
@@ -62,15 +63,28 @@ ${generatedPrompt}
 `;
 
   try {
-    const completion = await anthropicClient.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      temperature: 0.1,
-      system: FIGMA_SPEC_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userMessage }]
-    });
-
-    let jsonStr = completion.content[0].text.trim();
+    let jsonStr = '';
+    if (platformType === 'openai') {
+      const completion = await client.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: FIGMA_SPEC_SYSTEM_PROMPT },
+          { role: "user", content: userMessage }
+        ],
+        temperature: 0.1,
+        response_format: { type: "json_object" }
+      });
+      jsonStr = completion.choices[0].message.content.trim();
+    } else {
+      const completion = await client.messages.create({
+        model: 'claude-3-5-sonnet-latest',
+        max_tokens: 4096,
+        temperature: 0.1,
+        system: FIGMA_SPEC_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userMessage }]
+      });
+      jsonStr = completion.content[0].text.trim();
+    }
     
     // Clean JSON
     jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();

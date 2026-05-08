@@ -47,94 +47,94 @@ export async function refinePrompt(client, manifestContext, platformType = 'anth
     multipleReferences,
     clientResourcesSections,
     contentSource,
-    contentSummary // NEW: Cached summary
+    contentSummary
   } = manifestContext;
 
-  const hasSections = clientResourcesSections && clientResourcesSections.length > 0;
-  const hasReference = (referenceUrl && referenceUrl.trim() !== '') || (multipleReferences && multipleReferences.length > 0);
-  const hasContent = contentSource && contentSource.trim() !== '';
-
-  let priorityDirective = '';
-  if (hasSections && hasReference && hasContent) {
-    priorityDirective = `### LOGIC RULE: [Sections + Reference + Content]
-Incorporate the provided content effectively. The UI must be built around the specific data points and value propositions.`;
-  } else if (hasSections && hasReference) {
-    priorityDirective = `### LOGIC RULE: [Sections + Reference]
-Apply the style and structure of the reference website while embedding ALL Added Sections and their specific notes.`;
-  } else if (hasSections && !hasReference) {
-    priorityDirective = `### LOGIC RULE: [Sections Only]
-Base the prompt entirely on the sections. Use every note and description word-for-word.`;
-  } else if (!hasSections && hasReference) {
-    priorityDirective = `### LOGIC RULE: [Reference Only]
-Use the style, structure, and design of the reference website as the absolute foundation.`;
-  }
-
   const refinementSystemPrompt = `You are a Senior Design Director and Expert UI Prompt Engineer.
-Your goal is to generate a massive, technical, and ABSOLUTE Master UI Prompt.
-You are tasked with providing HYPER-DETAILED, EXHAUSTIVE, and MICROSCOPIC technical specifications.
-The output capacity must be maximized: do not be concise, be voluminous and precise.
-Every pixel, interaction, and content piece must be described in elaborate detail.
+Your goal is to generate a concise, complete, and STATIC Master UI Prompt.
 
-### CONTENT INTEGRATION RULE:
-1. DESIGN AROUND CONTENT: Use the provided "CONTENT SUMMARY" to structure the UI architecture.
-2. REFERENCE THE VERBATIM BLOCK: Your instructions must explicitly tell the downstream AI to pull all specific copy, text, and data from the "[VERBATIM CONTENT REPOSITORY]" block at the end of the prompt.
-3. NO SUMMARIZATION IN OUTPUT: When describing sections, specify EXACTLY which parts of the verbatim content go where.
+### MANDATORY OUTPUT STRUCTURE:
+Your response must follow this EXACT Markdown structure:
+
+# Homepage Design Prompt
+
+## Project Overview
+- Business Name: [Name]
+- Website Layout: [Layout]
+- Theme Mode: [Theme] Mode
+- Brand Colors: Primary ([Color]), Secondary ([Color])
+- Fonts: Heading ([Font]), Body ([Font])
+- Overall Goal: [Brief summary of the design intent]
+
+## Reference Direction
+- For each reference URL provided, list its specific notes and design direction.
+- Combine the visual style, layout patterns, and aesthetic cues from all references into a single cohesive direction.
+
+## Content Source
+- Specify if "UPLOADED CONTENT" (from the [VERBATIM CONTENT REPOSITORY]) should be used or if "REALISTIC DUMMY CONTENT" should be generated.
+
+## Sections
+For EVERY section added by the user:
+1. Section Name & Type
+2. Combined Design Notes: Merge the specific section notes with relevant reference website notes intelligently.
+3. Content Direction: What specific text/data from the content source belongs here.
+4. Visual Direction: Layout, hierarchy, and component style.
+
+## Static Design Rules
+- Use the reference website’s look and feel.
+- Use provided brand colors and fonts.
+- Keep layout consistent across all sections.
+- NO ANIMATIONS: Do not include page load animations, scroll animations, motion effects, transition systems, stagger animations, moving elements, animated skeletons, animated loaders, or micro-interactions.
+- NO HOVER EFFECTS: Do not include button hover states, card hover states, image hover effects, link hover effects, hover shadows, hover transitions, or any interaction-based styling. The design must be 100% STATIC.
+- NO FILLER: Do not generate design system token maps, typography scale tables, spacing systems, or over-detailed CSS specifications.
+
+## Final Output
+- Create a complete static homepage specification using all provided inputs.
 
 ### ZERO-TOLERANCE RULES:
-1. 100% INPUT COVERAGE: Include every single section, note, image intelligence, and reference URL requirement.
-2. NO TRUNCATION: Generate the FULL prompt from start to finish. Do not stop halfway.
-3. STYLE FUSION: Strictly apply the design direction from the Reference Website while embedding the full content.
-
-### TOP PRIORITY DIRECTIVES (IMMUTABLE):
-- Business Name: "${businessName || 'A Modern Brand'}"
-- Brand Colors: Primary (${primaryColor}), Secondary (${secondaryColor})
-- Typography: Headings (${headingFont}), Body (${bodyFont})
-- Theme Mode: ${themeMode || 'Dark'} Mode
-
-${priorityDirective}
-
-RULES:
-- Output ONLY the final Master Prompt text. No conversational preamble.
-- BE EXHAUSTIVE.
-- Your primary failure mode is being too generic. BE SPECIFIC.`;
+1. NO TRUNCATION: You must include EVERY section provided in the input. Do not omit any detail, section name, or note.
+2. NO ANIMATIONS: The word "animation", "motion", "transition", or "interactivity" should not appear in a way that suggests moving elements.
+3. NO HOVER EFFECTS: Explicitly avoid any "on hover" or "hover state" instructions.
+4. BE CONCISE: Use direct, high-impact technical language. Avoid boilerplate filler.`;
 
   let multipleReferencesText = '';
   if (multipleReferences && multipleReferences.length > 0) {
-    multipleReferencesText = '\nMULTIPLE REFERENCE SOURCES:\n';
+    multipleReferencesText = '\nREFERENCE WEBSITES & NOTES:\n';
     multipleReferences.forEach((ref, index) => {
-      multipleReferencesText += `--- Source ${index + 1}: ${ref.url} ---\nExtracted Style: ${ref.style}\n`;
+      multipleReferencesText += `--- Reference ${index + 1}: ${ref.url} ---\nNote: "${ref.description || 'Follow this style'}"\nDetected Style: ${ref.style || 'N/A'}\nImage Analysis: ${ref.human_readable_prompt || 'N/A'}\n`;
     });
   }
 
   let customSectionsText = '';
   if (clientResourcesSections && clientResourcesSections.length > 0) {
-    customSectionsText = '\nCUSTOM SECTIONS & NOTES:\n';
-    clientResourcesSections.forEach((sec) => {
-      customSectionsText += `- ${sec.type}: "${sec.description || 'N/A'}"\n`;
+    customSectionsText = '\nSECTIONS TO INCLUDE (WITH SPECIFIC NOTES):\n';
+    clientResourcesSections.forEach((sec, idx) => {
+      customSectionsText += `Section ${idx + 1}: ${sec.type}\n- Note: "${sec.description || 'N/A'}"\n- Image Analysis Intelligence: ${sec.human_readable_prompt || 'Follow global style'}\n`;
     });
   }
 
-  const userMessage = `Refine this design context into an exhaustive Master UI Prompt.
 
-MANIFEST INPUTS:
-- Business Name: ${businessName || 'N/A'}
-- Ordered Sections: ${sectionOrder ? sectionOrder.join(' → ') : 'N/A'}
+  const userMessage = `Generate the Master UI Prompt based on these inputs:
+
+BUSINESS: ${businessName || 'N/A'}
+LAYOUT: ${websiteLayout || 'N/A'}
+THEME: ${themeMode || 'Dark'}
+COLORS: Primary (${primaryColor}), Secondary (${secondaryColor})
+FONTS: Heading (${headingFont}), Body (${bodyFont})
+
 ${customSectionsText}
 ${multipleReferencesText}
 
-CONTENT SUMMARY (FOR ARCHITECTURE):
-${contentSummary || 'No specific content provided. Generate realistic professional dummy copy.'}
+CONTENT SUMMARY (USE FOR MERGING SECTION NOTES):
+${contentSummary || 'No specific content provided. Use realistic professional dummy copy.'}
 
 INSTRUCTIONS:
-1. Design a UI that perfectly accommodates the content described in the summary.
-2. Apply the reference style to the layout.
-3. MAXIMIZE OUTPUT CAPACITY: Provide an exhaustive, line-by-line breakdown of every UI component, animation, and responsive behavior.
-4. DO NOT TRUNCATE.`;
+1. Merge section notes, reference notes, and uploaded content intelligence intelligently.
+2. Ensure ALL sections listed above are present in the output. DO NOT TRUNCATE.
+3. Maintain a strictly STATIC design focus—NO ANIMATIONS, NO HOVER EFFECTS.
+4. Follow the MANDATORY OUTPUT STRUCTURE exactly.`;
 
   let finalPrompt = '';
-  
-  // Use a single attempt for speed, as we will manually append content at the end for fidelity
-  console.log(`[Refinement] Generating prompt (${platformType})...`);
   
   if (platformType === 'openai') {
     const completion = await client.chat.completions.create({
@@ -143,30 +143,29 @@ INSTRUCTIONS:
         { role: "system", content: refinementSystemPrompt },
         { role: "user", content: userMessage }
       ],
-      temperature: 0.4,
-      max_tokens: 4000,
+      temperature: 0.3,
+      max_tokens: 4096,
     });
     finalPrompt = completion.choices[0].message.content.trim();
   } else {
     const completion = await client.messages.create({
-      model: 'claude-3-5-sonnet-latest',
-      max_tokens: 4000,
-      temperature: 0.4,
+      model: 'claude-sonnet-4-6',
+      max_tokens: 8192,
+      temperature: 0.3,
       system: refinementSystemPrompt,
       messages: [{ role: 'user', content: userMessage }]
     });
     finalPrompt = completion.content[0].text.trim();
   }
 
-  // ENSURE VERBATIM FIDELITY: Manually append the full content repository at the end.
-  // This is much faster than asking the AI to repeat 3000 words.
   if (contentSource && contentSource.trim().length > 0) {
     finalPrompt += `\n\n---
 [VERBATIM CONTENT REPOSITORY]
 ${contentSource}
 ---
-*Note: The architectural breakdown above specifies how to integrate this verbatim text.*`;
+*Note: Use the verbatim text from this repository for all specific section copy.*`;
   }
 
   return finalPrompt;
 }
+

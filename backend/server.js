@@ -77,9 +77,32 @@ const anthropic = anthropicKey ? new Anthropic({ apiKey: anthropicKey }) : null;
 const openai = openAIKey ? new OpenAI({ apiKey: openAIKey }) : null;
 
 // ── Middleware ───────────────────────────────────────────────────────────────
-app.use(cors());
+// ── Middleware ───────────────────────────────────────────────────────────────
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:3000',
+  'https://ai-project-nu-three.vercel.app'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
+
 
 // ── AI Helper ──────────────────────────────────────────────────────────────
 function getAIClient(platformKey) {
@@ -995,4 +1018,9 @@ app.get('/api/figma-export/latest/item', (req, res) => {
   }
 });
 
-app.listen(port, () => console.log(`🚀 Backend running at http://localhost:${port}`));
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(port, () => console.log(`🚀 Backend running at http://localhost:${port}`));
+}
+
+export default app;
+

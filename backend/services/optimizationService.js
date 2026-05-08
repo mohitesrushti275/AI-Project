@@ -15,7 +15,7 @@ export async function summarizeContent(client, content, platformType = 'anthropi
 
   console.log('[OptimizationService] Summarizing large content source...');
   
-  const systemPrompt = "You are an expert content analyzer. Summarize the following text into a structured, technical design brief. Capture all key entities, value propositions, features, and specific data points, but remove fluff. Keep it under 500 words. Focus on what is needed to build a UI around this content.";
+  const systemPrompt = "You are an expert content analyzer. Create a comprehensive, technical design brief from the following text. Capture all key entities, value propositions, features, and specific data points in detail. Focus on providing every technical detail needed to build a UI around this content.";
   
   let summary = '';
   if (platformType === 'openai') {
@@ -23,17 +23,17 @@ export async function summarizeContent(client, content, platformType = 'anthropi
       model: "gpt-4o-mini", // Use faster/cheaper model for summarization
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Please summarize this content for a UI designer:\n\n${content}` }
+        { role: "user", content: `Please provide a detailed technical summary of this content for a UI designer:\n\n${content}` }
       ],
-      max_tokens: 1000,
+      max_tokens: 4096,
     });
     summary = completion.choices[0].message.content;
   } else {
     const completion = await client.messages.create({
       model: 'claude-3-haiku-20240307', // Use faster/cheaper model for summarization
-      max_tokens: 1000,
+      max_tokens: 4096,
       system: systemPrompt,
-      messages: [{ role: 'user', content: `Please summarize this content for a UI designer:\n\n${content}` }]
+      messages: [{ role: 'user', content: `Please provide a detailed technical summary of this content for a UI designer:\n\n${content}` }]
     });
     summary = completion.content[0].text;
   }
@@ -60,18 +60,23 @@ export function optimizePayload(data) {
     sectionOrder: data.sectionOrder || [],
     referenceUrl: data.referenceUrl,
     // Add multiple references style summaries if available
-    multipleReferences: (data.multipleAnalyses || []).map(ref => ({
+    multipleReferences: (Array.isArray(data.multipleAnalyses) ? data.multipleAnalyses : []).map(ref => ({
       url: ref.url,
       style: ref.style,
       layout: ref.layout,
-      description: ref.description
+      description: ref.description,
+      human_readable_prompt: ref.human_readable_prompt
     })),
     // Add custom sections notes
-    customSections: (data.clientResourcesSections || []).map(sec => ({
+    clientResourcesSections: (Array.isArray(data.clientResourcesSections) ? data.clientResourcesSections : []).map(sec => ({
       type: sec.type,
-      description: sec.description
+      description: sec.description,
+      style: sec.style,
+      layout: sec.layout,
+      human_readable_prompt: sec.human_readable_prompt
     }))
   };
+
 
   return optimized;
 }

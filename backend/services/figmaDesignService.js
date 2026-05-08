@@ -77,8 +77,8 @@ ${generatedPrompt}
       jsonStr = completion.choices[0].message.content.trim();
     } else {
       const completion = await client.messages.create({
-        model: 'claude-3-5-sonnet-latest',
-        max_tokens: 4096,
+        model: 'claude-sonnet-4-6',
+        max_tokens: 8192,
         temperature: 0.1,
         system: FIGMA_SPEC_SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userMessage }]

@@ -14,7 +14,7 @@ Return ONLY a single valid JSON object — no markdown fences, no explanation, n
   "uiPatterns": ["<Cards with glowing borders>", "<Sticky Nav>", "<Pill buttons>"],
   "spacing": "<describe the spacing rhythm and whitespace density, e.g. 'Generous whitespace, 64px section padding'>",
   "visualHierarchy": "<describe how focus is directed, e.g. 'Size-based hierarchy, high contrast CTA buttons'>",
-  "human_readable_prompt": "<A highly detailed, 400+ word technical master prompt describing how to reconstruct this UI identically, describing all colors, spacing, structure, and aesthetic choices >"
+  "human_readable_prompt": "<A highly detailed technical master prompt describing how to reconstruct this UI identically, including colors, spacing, structure, and aesthetic choices. Focus on STATIC design only. NO animation, motion, or hover-effect instructions.>"
 }
 
 RULES:
@@ -22,7 +22,11 @@ RULES:
 - Focus completely on frontend design, architecture, and styling.
 - Analyze from top to bottom.
 - Ensure the prompt is suitable for prompting AI UI code generators.
+- NO ANIMATIONS: The generated prompt must describe a static design.
+- NO HOVER EFFECTS: Do not include any hover-state or interaction-based instructions.
+- STATIC ONLY: The design must be described in its final resting state.
 `;
+
 
 export async function optimizeScreenshot(base64Image) {
   console.log('[ImageToPromptService] Optimizing screenshot for Anthropic...');
@@ -81,7 +85,7 @@ INSTRUCTIONS:
     rawContent = completion.choices[0].message.content;
   } else {
     const completion = await client.messages.create({
-      model: 'claude-3-5-sonnet-latest',
+      model: 'claude-sonnet-4-6',
       max_tokens: 4096,
       temperature: 0.2,
       system: UI_ANALYSIS_SYSTEM_PROMPT,

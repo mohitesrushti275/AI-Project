@@ -237,7 +237,8 @@ const DesignManifestPreview = ({
   isTransforming,
   figmaUrl,
   onPreviewFigma,
-  onExportMD
+  onExportMD,
+  isGenerating
 }: {
   generatedPrompt: string;
   contentSource: string;
@@ -250,6 +251,7 @@ const DesignManifestPreview = ({
   figmaUrl?: string;
   onPreviewFigma?: () => void;
   onExportMD?: () => void;
+  isGenerating?: boolean;
 }) => {
   const [activeTab, setActiveTab] = useState<'prompt' | 'source' | 'screenshot' | 'json' | 'devspec'>('prompt');
 
@@ -258,6 +260,51 @@ const DesignManifestPreview = ({
       setActiveTab('screenshot');
     }
   }, [screenshotUrl]);
+
+  if (isGenerating) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '16px' }}>
+        <div className="step-header">
+          <span className="animate-pulse">Generating Design Concept...</span>
+        </div>
+        <div style={{
+          minHeight: '520px',
+          border: '1px solid var(--border)',
+          borderRadius: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '40px',
+          flex: 1,
+          background: 'rgba(255,255,255,0.01)'
+        }}>
+          <div className="animate-pulse" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+            <Wand2 size={48} style={{ color: '#3368F7', opacity: 0.8 }} />
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '15px', fontWeight: 600, color: '#E5E7EB', marginBottom: '8px' }}>Generating your prompt...</p>
+              <p style={{ fontSize: '13px', color: '#94A3B8', maxWidth: '240px', lineHeight: 1.5 }}>
+                Our AI is analyzing your reference sites and sections to craft a specialized design specification.
+              </p>
+            </div>
+            <div style={{ 
+              marginTop: '12px', 
+              padding: '6px 12px', 
+              background: 'rgba(51, 104, 247, 0.1)', 
+              borderRadius: '999px',
+              fontSize: '11px',
+              fontWeight: 700,
+              color: '#3368F7',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em'
+            }}>
+              Pipeline Active
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!generatedPrompt && !screenshotUrl && !structuredPrompt) {
     return (
@@ -398,15 +445,14 @@ const DesignManifestPreview = ({
         border: '1px solid var(--border)',
         borderRadius: '16px',
         background: 'rgba(255,255,255,0.01)',
-        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column'
       }}>
         <div style={{
-          height: '680px',
+          flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden'
+          minHeight: 0
         }}>
           {activeTab === 'prompt' && (
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -570,6 +616,7 @@ const DesignManifestPreview = ({
               else if (activeTab === 'json') navigator.clipboard.writeText(JSON.stringify(structuredPrompt, null, 2));
               else if (activeTab === 'devspec') navigator.clipboard.writeText(JSON.stringify(devSpecResult, null, 2));
             }}
+            disabled={isGenerating || (!generatedPrompt && activeTab === 'prompt')}
           >
             <Copy size={14} style={{ marginRight: '8px' }} />
             {activeTab === 'prompt' ? 'Copy Master Prompt' : activeTab === 'json' ? 'Copy JSON Schema' : activeTab === 'devspec' ? 'Copy Dev Spec' : 'Copy Source Text'}
@@ -583,7 +630,7 @@ const DesignManifestPreview = ({
                 if (onPreviewFigma) onPreviewFigma();
                 else if (figmaUrl) window.open(figmaUrl, '_blank');
               }}
-              disabled={!generatedPrompt && !figmaUrl}
+              disabled={isGenerating || (!generatedPrompt && !figmaUrl)}
             >
               <Layout size={14} style={{ marginRight: '8px' }} />
               Preview In Figma
@@ -595,7 +642,7 @@ const DesignManifestPreview = ({
               className="action-btn secondary"
               style={{ width: 'fit-content', marginTop: 0, height: '44px', padding: '0 20px', fontSize: '13px' }}
               onClick={onExportMD}
-              disabled={!generatedPrompt}
+              disabled={isGenerating || !generatedPrompt}
             >
               <FileText size={14} style={{ marginRight: '8px' }} />
               Download design.md
@@ -1352,7 +1399,7 @@ ${generatedPrompt}
                               {sec.imageUrl && (
                                 <div style={{ background: '#000', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)', padding: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                   <img src={sec.imageUrl} alt="preview" style={{ height: '48px', width: 'auto', borderRadius: '4px', objectFit: 'cover' }} />
-                                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sec.imageFile?.name}</span>
+                                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>{sec.imageFile?.name}</span>
                                 </div>
                               )}
 
@@ -1726,6 +1773,7 @@ ${generatedPrompt}
                     figmaUrl={manifest.figmaUrl}
                     onPreviewFigma={activeTab === 'Clients Resources' ? handlePreviewFigma : undefined}
                     onExportMD={activeTab === 'Clients Resources' ? handleExportMD : undefined}
+                    isGenerating={isGeneratingFromReference}
                   />
                 </div>
               </div>

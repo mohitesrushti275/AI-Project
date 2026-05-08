@@ -343,7 +343,7 @@ app.post('/api/analyze', (req, res, next) => {
 
     const completion = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
+      max_tokens: 8192,
       temperature: 0.2,
       system: SYSTEM_PROMPT + '\n\nCRITICAL: Your response must be a single valid JSON object ONLY. No preamble, no explanation, no markdown, no trailing text. Start your response with { and end with }.',
       messages: [
@@ -488,8 +488,8 @@ app.post('/api/generate-manifest', async (req, res) => {
       promptResult = completion.choices[0].message.content;
     } else {
       const completion = await client.messages.create({
-        model: 'claude-3-5-sonnet-latest',
-        max_tokens: 4096,
+        model: 'claude-sonnet-4-6',
+        max_tokens: 8192,
         temperature: 0.7,
         system: `You are an elite Digital Architect and AI Prompt Engineer. Your task is to generate a comprehensive "Website Generation Master Prompt".
         
@@ -714,6 +714,11 @@ app.post('/api/design-manifest/generate-from-reference', (req, res, next) => {
 
           if (cachedAnalysis) {
             console.log(`[Optimization] Using cached analysis for ${ref.url}`);
+            // Attach analysis results to reference
+            ref.style = cachedAnalysis.style;
+            ref.layout = cachedAnalysis.layout;
+            ref.human_readable_prompt = cachedAnalysis.human_readable_prompt;
+
             allAnalyses.push({ ...cachedAnalysis, ...ref });
             if (!optimizedBase64) optimizedBase64 = cachedAnalysis.screenshotBase64;
             continue;
@@ -740,8 +745,14 @@ Please extract design intelligence ONLY relevant to this description.`.trim();
             // Cache the result
             setAnalysisToCache(analysisHash, { ...analysis, screenshotBase64: oBase64 });
 
+            // Attach analysis results to reference
+            ref.style = analysis.style;
+            ref.layout = analysis.layout;
+            ref.human_readable_prompt = analysis.human_readable_prompt;
+
             allAnalyses.push({ ...analysis, ...ref });
             if (!optimizedBase64) optimizedBase64 = oBase64;
+
 
           } catch (err) {
             console.error(`[Unified Flow ✗] Failed processing ${ref.url}:`, err);
@@ -763,6 +774,11 @@ User Description: "${sec.description || 'N/A'}"
 Please extract design intelligence ONLY relevant to this section and description.`.trim();
 
               const analysis = await analyzeUI_Image(client, sec.imageBase64, userContext, platformType);
+              // Attach analysis results to section
+              sec.style = analysis.style;
+              sec.layout = analysis.layout;
+              sec.human_readable_prompt = analysis.human_readable_prompt;
+              
               allAnalyses.push({ ...analysis, sectionType: sec.type, description: sec.description, source: 'Custom Section Image' });
               if (!optimizedBase64) optimizedBase64 = sec.imageBase64;
             } catch (err) {
@@ -779,6 +795,7 @@ Please extract design intelligence ONLY relevant to this section and description
           }
         }
       }
+
 
       if (allAnalyses.length > 0) {
         aiAnalysis = { ...aiAnalysis, ...allAnalyses[0] };
@@ -822,6 +839,8 @@ Theme Mode: ${themeMode || 'Dark'}
     // Optimization: Clean and optimize the context payload
     const context = optimizePayload({
       ...req.body,
+      referenceWebsites,
+      clientResourcesSections,
       sections: finalSections,
       sectionOrder: sectionOrderInput && sectionOrderInput.length > 0 ? sectionOrderInput : finalSections,
       structuredPrompt: aiAnalysis,
@@ -861,7 +880,7 @@ Theme Mode: ${themeMode || 'Dark'}
       themeMode,
       analysisMetadata: {
         timestamp: new Date().toISOString(),
-        engine: platformType === 'openai' ? 'gpt-4o' : 'claude-6-4-sonnet-latest'
+        engine: platformType === 'openai' ? 'gpt-4o' : 'claude-sonnet-4-6'
       }
     });
 

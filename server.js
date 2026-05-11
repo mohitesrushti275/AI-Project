@@ -7,7 +7,7 @@ import sharp from 'sharp';
 import OpenAI from 'openai';
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // ── OpenAI client ─────────────────────────────────────────────────────────────
 const rawKey = (process.env.OPENAI_API_KEY || '').trim();

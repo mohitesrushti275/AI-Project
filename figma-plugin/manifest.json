@@ -6,6 +6,6 @@
   "ui": "ui.html",
   "editorType": ["figma"],
   "networkAccess": {
-    "allowedDomains": ["http://localhost:3000", "https://*"]
+    "allowedDomains": ["http://localhost:3000", "https://api.promptpilot.sharehq.org", "https://*"]
   }
 }

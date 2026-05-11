@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Copy, Wand2, X, Download, Code as CodeIcon, FileText, Layout, ImageIcon, LayoutGrid, Upload, GripVertical, Plus } from 'lucide-react';
 import { Reorder } from 'framer-motion';
+import { API_BASE_URL } from './config';
 
 
 
@@ -750,7 +751,7 @@ export default function FrontendApp() {
     if (!structuredPromptResult) return;
     setIsTransforming(true);
     try {
-      const res = await fetch('http://localhost:3000/api/design-manifest/transform', {
+      const res = await fetch(`${API_BASE_URL}/api/design-manifest/transform`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ structuredPrompt: structuredPromptResult })
@@ -831,7 +832,7 @@ export default function FrontendApp() {
         formData.append('contentFile', manifest.contentFile);
       }
 
-      const res = await fetch('http://localhost:3000/api/design-manifest/generate-from-reference', {
+      const res = await fetch(`${API_BASE_URL}/api/design-manifest/generate-from-reference`, {
         method: 'POST',
         body: formData
       });
@@ -858,7 +859,7 @@ export default function FrontendApp() {
     
     setIsExportingToFigma(true);
     try {
-      const res = await fetch('http://localhost:3000/api/figma-export', {
+      const res = await fetch(`${API_BASE_URL}/api/figma-export`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1042,7 +1043,7 @@ ${generatedPrompt}
   };
 
   const fetchComponents = () => {
-    fetch('http://localhost:3000/api/components')
+    fetch(`${API_BASE_URL}/api/components`)
       .then(res => res.json())
       .then(data => {
         setComponents(data);
@@ -1057,7 +1058,7 @@ ${generatedPrompt}
     if (activeTab === 'Image to prompt') return;
     const comp = components.find(c => c.name === activeTab);
     if (comp) {
-      fetch(`http://localhost:3000/api/components/${comp.id}/subsections`)
+      fetch(`${API_BASE_URL}/api/components/${comp.id}/subsections`)
         .then(res => {
           if (!res.ok) throw new Error('Not found');
           return res.json();
@@ -1100,7 +1101,7 @@ ${generatedPrompt}
     try {
       const formData = new FormData();
       formData.append('image', file);
-      const res = await fetch('http://localhost:3000/api/analyze', { method: 'POST', body: formData });
+      const res = await fetch(`${API_BASE_URL}/api/analyze`, { method: 'POST', body: formData });
       const data = await res.json();
       if (!res.ok || data.error) {
         throw new Error(data.error || 'Failed to generate prompt');
@@ -1789,7 +1790,7 @@ ${generatedPrompt}
                   <GalleryCard key={item.id} title={item.title} onClick={async () => {
                     // Fetch fresh data for the modal to ensure sync
                     try {
-                      const res = await fetch(`http://localhost:3000/api/subsections/${item.id}`);
+                      const res = await fetch(`${API_BASE_URL}/api/subsections/${item.id}`);
                       const freshItem = await res.json();
                       setSelectedItem(freshItem);
                     } catch {

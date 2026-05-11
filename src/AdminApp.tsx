@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Layout, ChevronRight, Package, Upload, Code as CodeIcon, Terminal } from 'lucide-react';
+import { API_BASE_URL } from './config';
 
 
 interface Subsection {
@@ -38,7 +39,7 @@ export default function AdminApp() {
 
   const fetchComponents = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/components');
+      const res = await fetch(`${API_BASE_URL}/api/components`);
       const data = await res.json();
       setComponents(data);
       if (data.length > 0 && !selectedCompId) setSelectedCompId(data[0].id);
@@ -53,7 +54,7 @@ export default function AdminApp() {
   const handleCreateComp = async () => {
     if (!newCompName.trim()) return;
     try {
-      const res = await fetch('http://localhost:3000/api/components', {
+      const res = await fetch(`${API_BASE_URL}/api/components`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newCompName })
@@ -76,7 +77,7 @@ export default function AdminApp() {
     }
 
     try {
-      const res = await fetch(`http://localhost:3000/api/components/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/components/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: editName })
@@ -94,7 +95,7 @@ export default function AdminApp() {
   const handleDeleteComp = async (id: string) => {
     if (!confirm('Are you sure you want to delete this component and all its sections? This cannot be undone.')) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/components/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE_URL}/api/components/${id}`, { method: 'DELETE' });
       if (res.ok) {
         if (selectedCompId === id) setSelectedCompId(null);
         await fetchComponents();
@@ -133,8 +134,8 @@ export default function AdminApp() {
     if (!selectedCompId) return;
 
     const url = editingSectionId
-      ? `http://localhost:3000/api/subsections/${editingSectionId}`
-      : `http://localhost:3000/api/components/${selectedCompId}/subsections`;
+      ? `${API_BASE_URL}/api/subsections/${editingSectionId}`
+      : `${API_BASE_URL}/api/components/${selectedCompId}/subsections`;
 
     const method = editingSectionId ? 'PUT' : 'POST';
 
@@ -170,7 +171,7 @@ export default function AdminApp() {
   const handleDeleteSection = async (id: string) => {
     if (!confirm('Delete this section?')) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/subsections/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE_URL}/api/subsections/${id}`, { method: 'DELETE' });
       if (res.ok) {
         await fetchComponents();
       }

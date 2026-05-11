@@ -31,7 +31,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // ── Persistence Layer ────────────────────────────────────────────────────────
 const DATA_FILE = path.join(__dirname, 'data.json');
@@ -82,7 +82,8 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:3000',
-  'https://ai-project-nu-three.vercel.app'
+  'https://ai-project-nu-three.vercel.app',
+  'https://app.promptpilot.sharehq.org'
 ];
 
 app.use(cors({

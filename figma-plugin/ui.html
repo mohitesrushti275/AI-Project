@@ -55,9 +55,10 @@
       document.getElementById('generateBtn').disabled = true;
 
       try {
+        const API_BASE = 'https://api.promptpilot.sharehq.org';
         const url = designId 
-          ? `http://localhost:3000/api/figma-export/${designId}`
-          : `http://localhost:3000/api/figma-export/latest/item`;
+          ? `${API_BASE}/api/figma-export/${designId}`
+          : `${API_BASE}/api/figma-export/latest/item`;
           
         const response = await fetch(url);
         if (!response.ok) {

@@ -55,7 +55,7 @@
       document.getElementById('generateBtn').disabled = true;
 
       try {
-        const API_BASE = 'https://api.promptpilot.sharehq.org';
+        const API_BASE = 'https://apiserver.promptpilot.sharehq.org';
         const url = designId 
           ? `${API_BASE}/api/figma-export/${designId}`
           : `${API_BASE}/api/figma-export/latest/item`;
